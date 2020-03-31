@@ -35,18 +35,22 @@ for (j in 1:5) {
                      read.csv(i, header=FALSE, skip=1) %>%
                        select(V1, V2, V5, V8, V11, V13) %>%
                        mutate(venue = venues[k]) %>%
-                       slice(5:nrow(.))
-                   }) %>% 
-                     bind_rows())
-    
-    # Then combine into year dataframe
-    ifelse(
-      exists('master'), 
-      master <- rbind(master, df),
-      master <- df
-    )
+                       slice(5:nrow(.)) %>%
+                       setNames(nm = c('datetime', 'temperature',
+                                        'rainfall', 'humidity', 
+                                        'wind speed', "wind direction",
+                                       'venue'))
+                   }) %>%
+                bind_rows())
     
   }
+  
+  # Then combine into year dataframe
+  ifelse(
+    exists('master'), 
+    master <- rbind(master, df),
+    master <- df
+  )
   
 }
 
