@@ -37,6 +37,6 @@ DECISIONS
   2. Within-day temp comparison, demonstrating fluctuations through the day (morning, afternoon, evening - do hourly median temps)
   
 ACTIONS
-- LS and LK to sketch draft visuals to aim for
-- LS and LK to confirm no additional or changed venue locations
+- LK and LK to sketch draft visuals to aim for
+- LK and LK to confirm no additional or changed venue locations
 - BD to adjust analysis process to account for decisions made
