@@ -44,6 +44,7 @@ Included in the 2020 Update Tokyo Environmental Report will be a figure showing 
 ### Time periods
 
 **Olympic** -- 10 July until 9 August
+
 **Paralympic** -- 11 August until 6 September
 
 
