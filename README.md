@@ -16,6 +16,32 @@ Dr Julia Casadio created the first **Environmental Report** ahead of the Rio 201
 In lieu of the Tokyo 2020 Games (postponed due to the COVID-19 global pandemic), and at the time of writing, it is prudent to provide an update of 2020 conditions.
 
 ## Analysis
+To compare Olympic and Paralympic periods in 2020 to prior years, the update report will present the following measures and calculations:
+- Max day time temperature (deg C)
+- Relative humidity at hottest part of the day (%)
+- Max day time 'feels like' temperature (deg C)
+- Percentage days 'feels like' above 30 deg C (%)
+- Percentage days 'feels like' above 35 deg C (%)
+- Percentage days 'feels like' above 40 deg C (%)
+- Total rainfall over period (mm)
+- Number of days rainfall above 0mm (# or %)
+- ? Wind speed
+- ? Average air pollution
+- ? Average water pollution
+
+These will be reported for the following competition venues areas:
+1. Edogawa (*Tokyo Bay Zone*)
+2. Fuchu (*Heritage Zone*)
+3. Mobara (Surfing)
+4. Nerima (Shooting)
+5. Tokorozawa (Golf)
+6. Tsujido (Yachting)
+7. Izu (Cycling & Mountain Bike)
+8. Sapporo (Marathon & Race Walk)
+
+Included in the 2020 Update Tokyo Environmental Report will be a figure showing daily maximum 'feels like' temperature during the period, averaged across last 6 years.
+
+
 
 
 *****
