@@ -41,7 +41,10 @@ These will be reported for the following competition venues areas:
 
 Included in the 2020 Update Tokyo Environmental Report will be a figure showing daily maximum 'feels like' temperature during the period, averaged across last 6 years.
 
+### Time periods
 
+**Olympic** -- 10 July until 9 August
+**Paralympic** -- 11 August until 6 September
 
 
 *****
