@@ -47,6 +47,28 @@ Included in the 2020 Update Tokyo Environmental Report will be a figure showing 
 
 **Paralympic** -- 11 August until 6 September
 
+*****
+## Notes 2020-09-07
+
+Attendees: Ben, Lorenz
+
+Update meeting to discuss some details of data presentation for report. All data as defined below has been downloaded from the Japanese Meteorological Agency website.
+
+DATA
+- Years 2015-2020
+- Venues as listed above, plus additional Tokyo Central venue. Izu weather measurements gathered from **Ajiro** station.
+
+DECISIONS
+- Split tables into 1) Olympic lead-in and Games period, and 2) Para lead-in and Games period
+- In each table have 1 column for the years 2016, 2017, 2018, 2019, 2020. Grouping years (e.g. 2015-2017) makes it hard to aggregate individual measures i.e. how would you report humidity over that period? max? avg?
+- Separate the lead-in and Games sub-periods within each period 1 and 2
+- Remove wind measure, since sports interested in this would have investigated it further (e.g. Yachting)
+- No new data for air quality or water quality
+
+NEXT STEPS
+1. Ben to develop summary tables
+2. Ben to investigate additional charts, and amend line charts to reflect rolling average
+
 
 *****
 
