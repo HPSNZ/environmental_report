@@ -1,0 +1,543 @@
+---
+title: "HPSNZ Environmental Report 2020"
+author: "Ben Day"
+date: "20/08/2020"
+output: html_document
+---
+
+```{r, setup, include=FALSE}
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+library(readr)
+library(tidyverse)
+library(lubridate)
+```
+
+## Introduction
+
+This R Markdown document allows the combination of analysis and explanation for future reference and reproducibility. Since the inaugural HPSNZ Environmental Report ahead of the Rio 2016 Games, the depth and detail of the reported measures have been enhanced for the Tokyo 2020 Games and this will enable better preparation.
+
+Precisely that this environmental report for performance preparation is refined during each cycle is the reason to document the analytical processes well. This enable continuous evaluation and improvement with as little friction as possible between personal analysis styles and data management.
+
+## Date periods
+
+Weather station measurement data was collected for two extended periods to account for lead-in athlete training preparation at the venue. Therefore the periods in focus for the 2020 Tokyo Games were:
+
+1) Olympic period, *10 July - 9 August*
+2) Paralympic period, *11 August - 6 September*
+
+These dates include two weeks prior to each official Games period (24 July - 9 August and 25 August - 6 September, respectfully)
+
+Data from years 2015 to present year 2020 will be gathered for analysis.
+
+## Venues
+
+Competition venues for Olympic and Paralympic sports are detailed below. Weather station measurement data was collected for all venues for both periods (1) and (2).
+
+Weather stations were selected as closest proximity to official competition venues.
+
+1. **Tokyo Central**&#42; *(Only venue with humidity measurements)*
+2. **Edogawa**, *Tokyo Bay Zone*
+3. **Fuchu**, *Heritage Zone*
+4. **Mobara**, *Surfing*
+5. **Nerima**, *Shooting*
+6. **Tokorozawa**, *Golf*
+7. **Tsujido**, *Yachting*
+8. **Izu**, *Cycling (All)*
+9. **Sapporo**, *Marathon & Race Walk*
+
+## Data sources
+
+For the Tokyo 2020 competition venues a combination of in-person measurements and publicly available weather station data was analysed and presented. Julia Casadio and Kim Simperingham were involved with the collection of water quality and air quality measurements alongside Japanese local experts, and Ben Day was responsible for the collection and analysis of weather station measurement data. The latter is the focus of this report.
+
+The Japanese Meteorlogical Agency [www.data.jma.go.jp/risk/obsdl/index.php] provides weather station measurements from around the country as hourly observations in various metrics. By selecting appropriate weather stations on a map, and defining an appropriate date range as detailed below, the following measurements can be downloaded as csv:
+
+- Temperature (deg C)
+- Rainfall (mm in previous hour)
+- Relative humidity (%)
+- Wind speed (m/s)
+
+### Weather station measurement data
+
+One .csv file was downloaded for each venue for each period, giving 9 x 2 files of data for each year. Then all files were collated into a 'master' dataset for analysis. The R code used to do this is detailed below.
+
+```{r files}
+# Check working diretory
+list.files(path = 'data/2020 update')
+folders_periods <- list.files(path = 'data/2020 update')
+
+# List files in each folder and get filenames
+list.files(path = paste('data/2020 update', folders_periods[1], '2020', sep = "/"))
+files_o <- list.files(path = paste('data/2020 update', folders_periods[1], '2020', sep = "/"), 
+                      pattern = "*.csv")
+files_p <- list.files(path = paste('data/2020 update', folders_periods[2], '2020', sep = "/"), 
+                      pattern = "*.csv")
+```
+
+A preview of one file is shown below.
+```{r preview}
+# Preview top 10 lines
+head(read.csv(file = './data/2020 update/Olympic_10Jul-9Aug/2020/edogawa.csv', 
+              header = FALSE, skip = 2), n = 10)
+```
+
+Individual data files can be collated and wrangled as follows:
+
+1. Skip header rows
+2. Identify useful columns of data
+3. Rename these columns for our use
+
+```{r read files}
+a2020 <- lapply(files_o, function(i) {
+  
+  # Some venues have alternate column structure
+  if (i %in% c("izu.csv", "sapporo.csv", "tokyo.csv")) {
+    useful_cols <- c(1, 2, 5, 9, 14) }
+  else {
+    useful_cols <- c(1, 2, 5, 8, 13)
+  }
+  
+  read.csv(file = paste0('./data/2020 update/', folders_periods[1], '/2020/', i), 
+           header = FALSE, skip = 1) %>%
+    mutate_all(as.character) %>%
+    slice(5:nrow(.)) %>%
+    select(useful_cols) %>%
+    setNames(nm = c('datetime', 'temperature', 'rainfall', 'wind speed','humidity'))
+  
+  })
+
+a2020 <- bind_rows(a2020, .id = "venue")
+a2020$venue <- lapply(a2020$venue, function(j) { j <- gsub('.csv', '', files_o[as.numeric(j)])})
+```
+
+This collates 1 year of venue weather observations into a file of the following form.
+
+```{r preview collated}
+head(a2020, n = 10)
+```
+Using a year vector it is possible to iterately collate venue data files, and finally bring together into a single master dataset.
+
+```{r year collate}
+# Years vector
+years <- c("2015", "2016", "2017", "2018", "2019", "2020")
+
+for (j in 1:length(years)) {
+  
+  # Get filenames
+  filenames = list.files(path = paste0('./data/2020 update/Olympic_10Jul-9Aug/', 
+                                       years[j]), pattern = "*.csv")
+  
+  # dataframe
+  df <- data.frame(matrix(nrow = 0, ncol = 5))
+    
+  df <- lapply(filenames, function(i) {
+    
+    # Some venues have alternate column structure
+    if (i %in% c("izu.csv", "sapporo.csv", "tokyo.csv")) {
+        useful_cols <- c(1, 2, 5, 9, 14) }
+    else {
+        useful_cols <- c(1, 2, 5, 8, 13) }
+    
+    read.csv(file = paste0('./data/2020 update/Olympic_10Jul-9Aug/', 
+                                           years[j], '/', i), header = FALSE, skip = 1) %>%
+    mutate_all(as.character) %>%
+    slice(5:nrow(.)) %>%
+    select(useful_cols) %>%
+    setNames(nm = c('datetime', 'temperature', 'rainfall', 'wind speed','humidity')) %>%
+    mutate(venue = gsub('.csv', '', i))
+  }) %>%
+  bind_rows()
+  
+  # Then combine into year dataframe
+  ifelse(
+    exists('oly_df'), 
+    oly_df <- rbind(oly_df, df),
+    oly_df <- df
+  )
+} 
+
+# End of years
+tail(oly_df)
+
+```
+
+The same method can be used to collate Paralympic period data.
+
+```{r year collate para, echo=FALSE}
+# Years vector
+years <- c("2015", "2016", "2017", "2018", "2019", "2020")
+
+for (j in 1:length(years)) {
+  
+  # Get filenames
+  filenames = list.files(path = paste0('./data/2020 update/Olympic_10Jul-9Aug/', 
+                                       years[j]), pattern = "*.csv")
+  
+  # dataframe
+  df <- data.frame(matrix(nrow = 0, ncol = 5))
+    
+  df <- lapply(filenames, function(i) {
+    
+    # Some venues have alternate column structure
+    if (i %in% c("izu.csv", "sapporo.csv", "tokyo.csv")) {
+        useful_cols <- c(1, 2, 5, 9, 14) }
+    else {
+        useful_cols <- c(1, 2, 5, 8, 13) }
+    
+    read.csv(file = paste0('./data/2020 update/Paralympic_11Aug-6Sep/', 
+                                           years[j], '/', i), header = FALSE, skip = 1) %>%
+    mutate_all(as.character) %>%
+    slice(5:nrow(.)) %>%
+    select(useful_cols) %>%
+    setNames(nm = c('datetime', 'temperature', 'rainfall', 'wind speed','humidity')) %>%
+    mutate(venue = gsub('.csv', '', i))
+  }) %>%
+  bind_rows()
+  
+  # Then combine into year dataframe
+  ifelse(
+    exists('para_df'), 
+    para_df <- rbind(para_df, df),
+    para_df <- df
+  )
+} 
+
+```
+
+### Quality assurance
+
+A quick calculation of approximately how many hourly observations we are expecting to have in our 'master' dataset can be done as follows.
+
+24 hours per day * 31 days in period * 6 years * 9 venues =
+~40,000 rows of measurements
+
+Passing this check, we can also check the distribution of measurements across venues and across years.
+
+```{r qa}
+# Olympic
+nrow(oly_df)
+
+oly_df %>% group_by(venue) %>% summarise(count = n())
+
+oly_df %>% group_by(year(datetime)) %>% summarise(count = n())
+
+# Paralympic
+nrow(para_df)
+
+para_df %>% group_by(venue) %>% summarise(count = n())
+
+para_df %>% group_by(year(datetime)) %>% summarise(count = n())
+
+```
+
+## Statistical analysis
+
+With collated datasets (`oly_df` and `para_df`) ready, now we can generate the desired summary statistics. In this case the *temperature*, *rainfall* and *humidity* measurements are to be used to calculate:
+
+- Maximum day time temperature (deg c)
+- Relative humidity at hottest part of the day (%)
+- Maximum day time 'feels like' temperature (deg C)
+- Minimum day time 'feels like' temperature (deg C)
+- Percentage days where 'feels like' temperature > 30 deg C (%)
+- Percentage days where 'feels like' temperature > 35 deg C (%)
+- Percentage days where 'feels like' temperature > 40 deg C (%)
+- Total rainfall over period (mm)
+- Number of days in period rained (#)
+
+Using the `tidyverse` and `lubridate` R packages these summaries are straightforward. These can be done by aggregating the hourly measurements over time periods and for each venue.
+
+#### Prepare dataset
+```{r data prep}
+oly_df <- oly_df %>%
+  mutate_at(.vars = vars(temperature, rainfall, `wind speed`, humidity), as.numeric) %>%
+  mutate(venue = as.factor(venue),
+         datetime = as_datetime(datetime))
+
+para_df <- para_df %>%
+  mutate_at(.vars = vars(temperature, rainfall, `wind speed`, humidity), as.numeric) %>%
+  mutate(venue = as.factor(venue),
+         datetime = as_datetime(datetime))
+```
+
+#### Maximum day time temperature
+``` {r}
+# Maximum day time temp
+q1 <- oly_df %>% 
+  group_by(year(datetime), venue) %>% 
+  summarise(maxTemp = max(temperature))
+ggplot(q1) + 
+  geom_bar(aes(x = `year(datetime)`, y = maxTemp, fill = venue), stat = 'identity') + 
+  facet_wrap(vars(venue))
+
+p1 <- para_df %>% 
+  group_by(year(datetime), venue) %>% 
+  summarise(maxTemp = max(temperature))
+ggplot(p1) + 
+  geom_bar(aes(x = `year(datetime)`, y = maxTemp, fill = venue), stat = 'identity') + 
+  facet_wrap(vars(venue))
+```
+
+#### Humidity at max day time temperature
+
+```{r}
+# Humidity at hottest part of day
+q1q2 <- oly_df %>%
+  filter(hour(datetime) >= 5 & hour(datetime) <= 19) %>%
+  group_by(year(datetime), venue) %>%
+  mutate(maxTemp = max(temperature)) %>%
+  filter(temperature == maxTemp) %>%
+  select(venue, maxTemp, humidity) %>%
+  unique()
+
+p1p2 <- para_df %>%
+  filter(hour(datetime) >= 5 & hour(datetime) <= 19) %>%
+  group_by(year(datetime), venue) %>%
+  mutate(maxTemp = max(temperature)) %>%
+  filter(temperature == maxTemp) %>%
+  select(venue, maxTemp, humidity) %>%
+  unique()
+
+```
+
+#### 'Feels like' temperature
+
+The calculation of 'feels like' temperature (also known as *apparent temperature*) uses the following formula with dry-bulb temperature and relative humidity factors. This is considered accurate for temperatures equal to or greater than 27 degrees Celsius and for humidity equal to or greater than 40%.
+
+`heatIndex = c1 + c2*T + c3*R + c4*T*R + c5*T^2 + c6*R^2 + c7*T^2*R + c8*T*R^2 + c9*T^2*R^2`
+
+Where
+
+`T` = ambient dry-bulb temperature (deg C)
+`R` = relative humidity (%)
+`c1` = -8.78469475556
+`c2` = 1.61139411
+`c3` = 2.33854883889
+`c4` = -0.14611605
+`c5` = -0.012308094
+`c6` = -0.0164248277778
+`c7` = 0.002211732
+`c8` = 0.00072546
+`c9` = -0.000003582
+
+```{r heatindex, echo=FALSE}
+
+heatIndex <- function(temp, humid) {
+  
+  if (temp < 27) {
+    warning('Heat index calculation valid only for temperatures 27 degrees or above')
+    return(temp)
+  }
+  
+  if (humid < 40) {
+    warning('Heat index calculation valid only for humidity 40% or above')
+    return(temp)
+  }
+  
+c1 = -8.78469475556
+c2 = 1.61139411
+c3 = 2.33854883889
+c4 = -0.14611605
+c5 = -0.012308094
+c6 = -0.0164248277778
+c7 = 0.002211732
+c8 = 0.00072546 
+c9 = -0.000003582
+
+heatIndex = c1 + c2*temp + c3*humid + 
+  c4*temp*humid + c5*(temp^2) + c6*(humid^2) + 
+  c7*(temp^2)*humid + c8*temp*(humid^2) + 
+  c9*(temp^2)*(humid^2)
+
+return(round(heatIndex, digits = 1))
+  
+}
+
+```
+
+```{r}
+# Feels like maximum temperature
+q3q4 <- oly_df %>%
+  filter(hour(datetime) >= 5 & hour(datetime) <= 19) %>%
+  mutate(feelsLike = heatIndex(temperature, humidity)) %>%
+  select(-rainfall, -`wind speed`) %>%
+  group_by(year(datetime), venue) %>%
+  summarise(maxFeelsLike = max(feelsLike),
+            minFeelsLike = min(feelsLike))
+ggplot(q3q4) + 
+  geom_line(aes(x = `year(datetime)`, y = maxFeelsLike, color = venue)) +
+  geom_line(aes(x = `year(datetime)`, y = minFeelsLike, color = venue)) +
+  facet_wrap(vars(venue))
+
+p3p4 <- para_df %>%
+  filter(hour(datetime) >= 5 & hour(datetime) <= 19) %>%
+  mutate(feelsLike = heatIndex(temperature, humidity)) %>%
+  select(-rainfall, -`wind speed`) %>%
+  group_by(year(datetime), venue) %>%
+  summarise(maxFeelsLike = max(feelsLike),
+            minFeelsLike = min(feelsLike))
+ggplot(p3p4) + 
+  geom_line(aes(x = `year(datetime)`, y = maxFeelsLike, color = venue)) +
+  geom_line(aes(x = `year(datetime)`, y = minFeelsLike, color = venue)) +
+  facet_wrap(vars(venue))
+```
+
+#### Days above 30, 35, 40 deg C
+
+It is useful to compare venues by how many days where the 'feels like' temperature exceeded certain thresholds.
+
+```{r}
+
+q5q6q7 <- oly_df %>%
+  mutate(feelsLike = heatIndex(temperature, humidity)) %>%
+  group_by(year(datetime), day(datetime), venue) %>%
+  summarise(maxFeelsLike = max(feelsLike)) %>%
+  group_by(venue, `year(datetime)`) %>%
+  mutate(over30 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 30])/
+                           n_distinct(`day(datetime)`))*100, 0),
+         over35 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 35])/
+                           n_distinct(`day(datetime)`))*100, 0),
+         over40 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 40])/
+                           n_distinct(`day(datetime)`))*100, 0)) %>%
+  select(`year(datetime)`, venue, over30, over35, over40) %>%
+  unique() %>%
+  arrange(venue)
+
+p5p6p7 <- para_df %>%
+  mutate(feelsLike = heatIndex(temperature, humidity)) %>%
+  group_by(year(datetime), day(datetime), venue) %>%
+  summarise(maxFeelsLike = max(feelsLike)) %>%
+  group_by(venue, `year(datetime)`) %>%
+  mutate(over30 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 30])/
+                           n_distinct(`day(datetime)`))*100, 0),
+         over35 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 35])/
+                           n_distinct(`day(datetime)`))*100, 0),
+         over40 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 40])/
+                           n_distinct(`day(datetime)`))*100, 0)) %>%
+  select(`year(datetime)`, venue, over30, over35, over40) %>%
+  unique() %>%
+  arrange(venue)
+
+```
+
+#### Total rainfall over period
+
+```{r}
+# Total rainfall
+q8 <- oly_df %>%
+  group_by(year(datetime), venue) %>%
+  summarise(rain = sum(rainfall))
+
+p8 <- para_df %>%
+  group_by(year(datetime), venue) %>%
+  summarise(rain = sum(rainfall))
+```
+
+#### Percentage of days rained
+
+``` {r}
+# Number days rained
+q9 <- oly_df %>% 
+  group_by(year(datetime), day(datetime), venue) %>%
+  summarise(rain = sum(rainfall)) %>%
+  group_by(venue, `year(datetime)`) %>%
+  mutate(daysrained = round(n_distinct(`day(datetime)`[rain > 0])/
+                              n_distinct(`day(datetime)`)*100, 0)) %>%
+  select(`year(datetime)`, venue, daysrained) %>%
+  unique()
+
+p9 <- para_df %>% 
+  group_by(year(datetime), day(datetime), venue) %>%
+  summarise(rain = sum(rainfall)) %>%
+  group_by(venue, `year(datetime)`) %>%
+  mutate(daysrained = round(n_distinct(`day(datetime)`[rain > 0])/
+                              n_distinct(`day(datetime)`)*100, 0)) %>%
+  select(`year(datetime)`, venue, daysrained) %>%
+  unique()
+
+```
+
+### Summary table
+
+Bringing together the analysis pieces for each aspect listed above we are left with the following.
+
+```{r summary table}
+allo <- left_join(q1q2, q3q4) %>%
+  left_join(., q5q6q7) %>%
+  left_join(., q8) %>%
+  left_join(., q9) %>%
+  rename('Year' = `year(datetime)`,
+         'Venue' = venue,
+         'Max Temp' = maxTemp,
+         'Humidity (%)' = humidity,
+         'Max Feels Like' = maxFeelsLike,
+         'Min Feels Like' = minFeelsLike,
+         'Days over 30 (%)' = over30,
+         'Days over 35 (%)' = over35,
+         'Days over 40 (%)' = over40,
+         'Total Rainfall (mm)' = rain,
+         'Days rained (%)' = daysrained)
+
+knitr::kable(allo)
+
+allp <- left_join(p1p2, p3p4) %>%
+  left_join(., p5p6p7) %>%
+  left_join(., p8) %>%
+  left_join(., p9) %>%
+  rename('Year' = `year(datetime)`,
+         'Venue' = venue,
+         'Max Temp' = maxTemp,
+         'Humidity (%)' = humidity,
+         'Max Feels Like' = maxFeelsLike,
+         'Min Feels Like' = minFeelsLike,
+         'Days over 30 (%)' = over30,
+         'Days over 35 (%)' = over35,
+         'Days over 40 (%)' = over40,
+         'Total Rainfall (mm)' = rain,
+         'Days rained (%)' = daysrained)
+
+knitr::kable(allp)
+
+```
+
+## Graphs of Daily Max Feels Like Temperature
+
+#### Olympic Period
+
+The following chart shows the day-by-day maximum 'feels like' temperature for **Tokyo Central**, averaged over 2015-2020 (last 6 years).
+
+```{r chart_o, warning=FALSE}
+
+gdf_o <- oly_df %>%
+  filter(venue == 'tokyo') %>%
+  mutate(feelsLike = as_vector(map2(temperature, humidity, heatIndex))) %>%
+  group_by(day(datetime)) %>%
+  summarise(`Feels Like Temperature` = mean(feelsLike, na.rm = TRUE),
+            Date = max(date(datetime))) %>%
+  rename('Day' = `day(datetime)`)
+
+ggplot(data = gdf_o, aes(x = Date, y = `Feels Like Temperature`)) +
+  geom_line() +
+  ggtitle('Tokyo Central Daily Max (Feels Like) Temperature',
+          subtitle = 'Olympic Period Averaged over 2015-2020')
+
+```
+
+#### Paralympic Period
+
+Below is the same chart for the Paralympic period.
+
+```{r chart_p, warning=FALSE}
+
+gdf_p <- para_df %>%
+  filter(venue == 'tokyo') %>%
+  mutate(feelsLike = as_vector(map2(temperature, humidity, heatIndex))) %>%
+  group_by(day(datetime)) %>%
+  summarise(`Feels Like Temperature` = mean(feelsLike, na.rm = TRUE),
+            Date = max(date(datetime))) %>%
+  rename('Day' = `day(datetime)`)
+
+ggplot(data = gdf_p, aes(x = Date, y = `Feels Like Temperature`)) +
+  geom_line() +
+  ggtitle('Tokyo Central Daily Max (Feels Like) Temperature',
+          subtitle = 'Paralympic Period Averaged over 2015-2020')
+
+```
