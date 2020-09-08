@@ -169,7 +169,7 @@ years <- c("2015", "2016", "2017", "2018", "2019", "2020")
 for (j in 1:length(years)) {
   
   # Get filenames
-  filenames = list.files(path = paste0('./data/2020 update/Olympic_10Jul-9Aug/', 
+  filenames = list.files(path = paste0('./data/2020 update/Paralympic_11Aug-6Sep/', 
                                        years[j]), pattern = "*.csv")
   
   # dataframe
@@ -199,9 +199,10 @@ for (j in 1:length(years)) {
     para_df <- rbind(para_df, df),
     para_df <- df
   )
-} 
+}
 
 ```
+
 
 ### Quality assurance
 
@@ -250,26 +251,29 @@ Using the `tidyverse` and `lubridate` R packages these summaries are straightfor
 oly_df <- oly_df %>%
   mutate_at(.vars = vars(temperature, rainfall, `wind speed`, humidity), as.numeric) %>%
   mutate(venue = as.factor(venue),
-         datetime = as_datetime(datetime))
+         datetime = as_datetime(datetime),
+         period = ifelse(month(datetime) == 7 & day(datetime) < 23, "lead-in", "games")) # define period
 
 para_df <- para_df %>%
   mutate_at(.vars = vars(temperature, rainfall, `wind speed`, humidity), as.numeric) %>%
   mutate(venue = as.factor(venue),
-         datetime = as_datetime(datetime))
+         datetime = as_datetime(datetime),
+         period = ifelse(month(datetime) == 8 & day(datetime) < 24, "lead-in", "games")) # define period)
+
 ```
 
 #### Maximum day time temperature
 ``` {r}
 # Maximum day time temp
 q1 <- oly_df %>% 
-  group_by(year(datetime), venue) %>% 
+  group_by(year(datetime), venue, period) %>%
   summarise(maxTemp = max(temperature))
 ggplot(q1) + 
   geom_bar(aes(x = `year(datetime)`, y = maxTemp, fill = venue), stat = 'identity') + 
   facet_wrap(vars(venue))
 
 p1 <- para_df %>% 
-  group_by(year(datetime), venue) %>% 
+  group_by(year(datetime), venue, period) %>%
   summarise(maxTemp = max(temperature))
 ggplot(p1) + 
   geom_bar(aes(x = `year(datetime)`, y = maxTemp, fill = venue), stat = 'identity') + 
@@ -282,19 +286,23 @@ ggplot(p1) +
 # Humidity at hottest part of day
 q1q2 <- oly_df %>%
   filter(hour(datetime) >= 5 & hour(datetime) <= 19) %>%
-  group_by(year(datetime), venue) %>%
+  group_by(year(datetime), venue, period) %>%
   mutate(maxTemp = max(temperature)) %>%
   filter(temperature == maxTemp) %>%
-  select(venue, maxTemp, humidity) %>%
-  unique()
+  select(venue, maxTemp, humidity, period) %>%
+  unique() %>%
+  summarise(maxTemp = max(maxTemp),
+            humidity = max(humidity))
 
 p1p2 <- para_df %>%
   filter(hour(datetime) >= 5 & hour(datetime) <= 19) %>%
-  group_by(year(datetime), venue) %>%
+  group_by(year(datetime), venue, period) %>%
   mutate(maxTemp = max(temperature)) %>%
   filter(temperature == maxTemp) %>%
-  select(venue, maxTemp, humidity) %>%
-  unique()
+  select(venue, maxTemp, humidity, period) %>%
+  unique() %>%
+  summarise(maxTemp = max(maxTemp),
+            humidity = max(humidity))
 
 ```
 
@@ -359,7 +367,7 @@ q3q4 <- oly_df %>%
   filter(hour(datetime) >= 5 & hour(datetime) <= 19) %>%
   mutate(feelsLike = heatIndex(temperature, humidity)) %>%
   select(-rainfall, -`wind speed`) %>%
-  group_by(year(datetime), venue) %>%
+  group_by(year(datetime), venue, period) %>%
   summarise(maxFeelsLike = max(feelsLike),
             minFeelsLike = min(feelsLike))
 ggplot(q3q4) + 
@@ -371,7 +379,7 @@ p3p4 <- para_df %>%
   filter(hour(datetime) >= 5 & hour(datetime) <= 19) %>%
   mutate(feelsLike = heatIndex(temperature, humidity)) %>%
   select(-rainfall, -`wind speed`) %>%
-  group_by(year(datetime), venue) %>%
+  group_by(year(datetime), venue, period) %>%
   summarise(maxFeelsLike = max(feelsLike),
             minFeelsLike = min(feelsLike))
 ggplot(p3p4) + 
@@ -388,31 +396,31 @@ It is useful to compare venues by how many days where the 'feels like' temperatu
 
 q5q6q7 <- oly_df %>%
   mutate(feelsLike = heatIndex(temperature, humidity)) %>%
-  group_by(year(datetime), day(datetime), venue) %>%
+  group_by(year(datetime), day(datetime), venue, period) %>%
   summarise(maxFeelsLike = max(feelsLike)) %>%
-  group_by(venue, `year(datetime)`) %>%
+  group_by(venue, `year(datetime)`, period) %>%
   mutate(over30 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 30])/
                            n_distinct(`day(datetime)`))*100, 0),
          over35 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 35])/
                            n_distinct(`day(datetime)`))*100, 0),
          over40 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 40])/
                            n_distinct(`day(datetime)`))*100, 0)) %>%
-  select(`year(datetime)`, venue, over30, over35, over40) %>%
+  select(`year(datetime)`, period, venue, over30, over35, over40) %>%
   unique() %>%
   arrange(venue)
 
 p5p6p7 <- para_df %>%
   mutate(feelsLike = heatIndex(temperature, humidity)) %>%
-  group_by(year(datetime), day(datetime), venue) %>%
+  group_by(year(datetime), day(datetime), venue, period) %>%
   summarise(maxFeelsLike = max(feelsLike)) %>%
-  group_by(venue, `year(datetime)`) %>%
+  group_by(venue, `year(datetime)`, period) %>%
   mutate(over30 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 30])/
                            n_distinct(`day(datetime)`))*100, 0),
          over35 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 35])/
                            n_distinct(`day(datetime)`))*100, 0),
          over40 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 40])/
                            n_distinct(`day(datetime)`))*100, 0)) %>%
-  select(`year(datetime)`, venue, over30, over35, over40) %>%
+  select(`year(datetime)`, period, venue, over30, over35, over40) %>%
   unique() %>%
   arrange(venue)
 
@@ -423,11 +431,11 @@ p5p6p7 <- para_df %>%
 ```{r}
 # Total rainfall
 q8 <- oly_df %>%
-  group_by(year(datetime), venue) %>%
+  group_by(year(datetime), venue, period) %>%
   summarise(rain = sum(rainfall))
 
 p8 <- para_df %>%
-  group_by(year(datetime), venue) %>%
+  group_by(year(datetime), venue, period) %>%
   summarise(rain = sum(rainfall))
 ```
 
@@ -436,28 +444,28 @@ p8 <- para_df %>%
 ``` {r}
 # Number days rained
 q9 <- oly_df %>% 
-  group_by(year(datetime), day(datetime), venue) %>%
+  group_by(year(datetime), day(datetime), venue, period) %>%
   summarise(rain = sum(rainfall)) %>%
-  group_by(venue, `year(datetime)`) %>%
+  group_by(venue, `year(datetime)`, period) %>%
   mutate(daysrained = round(n_distinct(`day(datetime)`[rain > 0])/
                               n_distinct(`day(datetime)`)*100, 0)) %>%
-  select(`year(datetime)`, venue, daysrained) %>%
+  select(`year(datetime)`, period, venue, daysrained) %>%
   unique()
 
 p9 <- para_df %>% 
-  group_by(year(datetime), day(datetime), venue) %>%
+  group_by(year(datetime), day(datetime), venue, period) %>%
   summarise(rain = sum(rainfall)) %>%
-  group_by(venue, `year(datetime)`) %>%
+  group_by(venue, `year(datetime)`, period) %>%
   mutate(daysrained = round(n_distinct(`day(datetime)`[rain > 0])/
                               n_distinct(`day(datetime)`)*100, 0)) %>%
-  select(`year(datetime)`, venue, daysrained) %>%
+  select(`year(datetime)`, period, venue, daysrained) %>%
   unique()
 
 ```
 
 ### Summary table
 
-Bringing together the analysis pieces for each aspect listed above we are left with the following.
+Bringing together the analysis pieces for each aspect listed above we are left with the following. Then export to excel for report.
 
 ```{r summary table}
 allo <- left_join(q1q2, q3q4) %>%
@@ -465,6 +473,7 @@ allo <- left_join(q1q2, q3q4) %>%
   left_join(., q8) %>%
   left_join(., q9) %>%
   rename('Year' = `year(datetime)`,
+         'Period' = period,
          'Venue' = venue,
          'Max Temp' = maxTemp,
          'Humidity (%)' = humidity,
@@ -474,15 +483,23 @@ allo <- left_join(q1q2, q3q4) %>%
          'Days over 35 (%)' = over35,
          'Days over 40 (%)' = over40,
          'Total Rainfall (mm)' = rain,
-         'Days rained (%)' = daysrained)
+         'Days rained (%)' = daysrained) %>%
+  filter(Year != 2015) %>%
+  arrange(desc(Period))
 
-knitr::kable(allo)
+
+# lapply(unique(allo$Venue), function(i) {
+#   allo %>% filter(Venue == i) %>%
+#     t() %>%
+#     knitr::kable()
+#   })
 
 allp <- left_join(p1p2, p3p4) %>%
   left_join(., p5p6p7) %>%
   left_join(., p8) %>%
   left_join(., p9) %>%
   rename('Year' = `year(datetime)`,
+         'Period' = period,
          'Venue' = venue,
          'Max Temp' = maxTemp,
          'Humidity (%)' = humidity,
@@ -492,9 +509,15 @@ allp <- left_join(p1p2, p3p4) %>%
          'Days over 35 (%)' = over35,
          'Days over 40 (%)' = over40,
          'Total Rainfall (mm)' = rain,
-         'Days rained (%)' = daysrained)
+         'Days rained (%)' = daysrained) %>%
+  filter(Year != 2015) %>%
+  arrange(desc(Period))
 
-knitr::kable(allp)
+# lapply(unique(allp$Venue), function(i) {
+#   allp %>% filter(Venue == i) %>%
+#     t() %>%
+#     knitr::kable()
+#   })
 
 ```
 
@@ -505,19 +528,32 @@ knitr::kable(allp)
 The following chart shows the day-by-day maximum 'feels like' temperature for **Tokyo Central**, averaged over 2015-2020 (last 6 years).
 
 ```{r chart_o, warning=FALSE}
+# Define moving average
+ma <- function(x, n = 5){stats::filter(x, rep(1 / n, n), sides = 2)}
 
 gdf_o <- oly_df %>%
-  filter(venue == 'tokyo') %>%
+  filter(venue == 'tokyo',
+         hour(datetime) != 0,
+         year(datetime) != 2015) %>%
   mutate(feelsLike = as_vector(map2(temperature, humidity, heatIndex))) %>%
   group_by(day(datetime)) %>%
   summarise(`Feels Like Temperature` = mean(feelsLike, na.rm = TRUE),
             Date = max(date(datetime))) %>%
-  rename('Day' = `day(datetime)`)
+  rename('Day' = `day(datetime)`) %>%
+  arrange(desc(Date)) %>%
+  mutate(`5 Day Rolling Avg` = ma(`Feels Like Temperature`, n = 5))
 
-ggplot(data = gdf_o, aes(x = Date, y = `Feels Like Temperature`)) +
-  geom_line() +
+g1 <- ggplot(data = gdf_o) +
+  geom_point(aes(x = Date, y = `Feels Like Temperature`)) +
+  geom_line(aes(x = Date, y = `5 Day Rolling Avg`), size = 2, color = 'blue') +
+  #geom_smooth(se = FALSE) +
   ggtitle('Tokyo Central Daily Max (Feels Like) Temperature',
-          subtitle = 'Olympic Period Averaged over 2015-2020')
+          subtitle = 'Olympic Period Averaged over 2016-2020') +
+  labs(caption = 'Blue line shows 5 day rolling average',
+       y = 'Feels Like Temperature (°C)') +
+  ylim(25, 36) + 
+  scale_x_date(expand = expand_scale(add = 2))
+g1
 
 ```
 
@@ -528,16 +564,66 @@ Below is the same chart for the Paralympic period.
 ```{r chart_p, warning=FALSE}
 
 gdf_p <- para_df %>%
-  filter(venue == 'tokyo') %>%
+  filter(venue == 'tokyo',
+         hour(datetime) != 0,
+         year(datetime) != 2015) %>%
   mutate(feelsLike = as_vector(map2(temperature, humidity, heatIndex))) %>%
   group_by(day(datetime)) %>%
   summarise(`Feels Like Temperature` = mean(feelsLike, na.rm = TRUE),
-            Date = max(date(datetime))) %>%
-  rename('Day' = `day(datetime)`)
+           Date = max(date(datetime))) %>%
+  rename('Day' = `day(datetime)`) %>%
+  arrange(desc(Date)) %>%
+  mutate(`5 Day Rolling Avg` = ma(`Feels Like Temperature`, n = 5))
 
-ggplot(data = gdf_p, aes(x = Date, y = `Feels Like Temperature`)) +
-  geom_line() +
+g2 <- ggplot(data = gdf_p) +
+  geom_point(aes(x = Date, y = `Feels Like Temperature`)) +
+  geom_line(aes(x = Date, y = `5 Day Rolling Avg`), size = 2, color = 'blue') +
+  #geom_smooth(se = FALSE) +
   ggtitle('Tokyo Central Daily Max (Feels Like) Temperature',
-          subtitle = 'Paralympic Period Averaged over 2015-2020')
+          subtitle = 'Olympic Period Averaged over 2016-2020') +
+  labs(caption = 'Blue line shows 5 day rolling average',
+       y = 'Feels Like Temperature (°C)') +
+  ylim(25, 36) + 
+  scale_x_date(expand = expand_scale(add = 2))
+g2
 
 ```
+
+## Writing files for report
+
+```{r exports}
+# Write data tables to spreadsheet
+library(xlsx)
+
+lapply(unique(allo$Venue), function(i) {
+  x <- allo %>% filter(Venue == i) %>% t()
+
+write.xlsx(x, 'data/2020 update/enviro_data_summary.xlsx', sheetName = paste0(i), 
+  col.names = FALSE, row.names = TRUE, append = TRUE)
+
+})
+
+lapply(unique(allp$Venue), function(i) {
+  x <- allp %>% filter(Venue == i) %>% t()
+
+write.xlsx(x, 'data/2020 update/enviro_data_summary_para.xlsx', sheetName = paste0(i), 
+  col.names = FALSE, row.names = TRUE, append = TRUE)
+
+})
+
+
+# Export charts and chart data
+ggsave('images/olympic_temp_chart.png', g1)
+ggsave('images/paralympic_temp_chart.png', g2)
+
+write.xlsx(gdf_o, 'data/2020 update/chart_data.xlsx', sheetName = 'olympic',
+           col.names = TRUE, row.names = TRUE, append = TRUE)
+write.xlsx(gdf_p, 'data/2020 update/chart_data.xlsx', sheetName = 'paralympic',
+           col.names = TRUE, row.names = TRUE, append = TRUE)
+
+```
+
+
+
+
+
