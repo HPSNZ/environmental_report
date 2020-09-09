@@ -63,10 +63,10 @@ One .csv file was downloaded for each venue for each period, giving 9 x 2 files 
 ```{r files}
 # Check working diretory
 list.files(path = 'data/2020 update')
-folders_periods <- list.files(path = 'data/2020 update')
+folders_periods <- c('Olympic_10Jul-9Aug', 'Paralympic_11Aug-6Sep')
 
 # List files in each folder and get filenames
-list.files(path = paste('data/2020 update', folders_periods[1], '2020', sep = "/"))
+list.files(pattern = '', path = paste('data/2020 update', folders_periods[1], '2020', sep = "/"))
 files_o <- list.files(path = paste('data/2020 update', folders_periods[1], '2020', sep = "/"), 
                       pattern = "*.csv")
 files_p <- list.files(path = paste('data/2020 update', folders_periods[2], '2020', sep = "/"), 
@@ -117,6 +117,7 @@ head(a2020, n = 10)
 Using a year vector it is possible to iterately collate venue data files, and finally bring together into a single master dataset.
 
 ```{r year collate}
+rm(oly_df)
 # Years vector
 years <- c("2015", "2016", "2017", "2018", "2019", "2020")
 
@@ -163,6 +164,7 @@ tail(oly_df)
 The same method can be used to collate Paralympic period data.
 
 ```{r year collate para, echo=FALSE}
+rm(para_df)
 # Years vector
 years <- c("2015", "2016", "2017", "2018", "2019", "2020")
 
@@ -252,31 +254,37 @@ oly_df <- oly_df %>%
   mutate_at(.vars = vars(temperature, rainfall, `wind speed`, humidity), as.numeric) %>%
   mutate(venue = as.factor(venue),
          datetime = as_datetime(datetime),
-         period = ifelse(month(datetime) == 7 & day(datetime) < 23, "lead-in", "games")) # define period
+         period = ifelse(month(datetime) == 7 & day(datetime) < 23, "lead-in", "games"),# define period
+         year = year(datetime),
+         day = day(datetime)) 
 
 para_df <- para_df %>%
   mutate_at(.vars = vars(temperature, rainfall, `wind speed`, humidity), as.numeric) %>%
   mutate(venue = as.factor(venue),
          datetime = as_datetime(datetime),
-         period = ifelse(month(datetime) == 8 & day(datetime) < 24, "lead-in", "games")) # define period)
+         period = ifelse(month(datetime) == 8 & day(datetime) < 24, "lead-in", "games"),# define period
+         year = year(datetime),
+         day = day(datetime))
 
 ```
 
 #### Maximum day time temperature
 ``` {r}
-# Maximum day time temp
+# Maximum and mean day time temp
 q1 <- oly_df %>% 
-  group_by(year(datetime), venue, period) %>%
-  summarise(maxTemp = max(temperature))
+  group_by(year, venue, period) %>%
+  summarise(maxTemp = max(temperature),
+            meanTemp = round(mean(temperature), 1))
 ggplot(q1) + 
-  geom_bar(aes(x = `year(datetime)`, y = maxTemp, fill = venue), stat = 'identity') + 
+  geom_bar(aes(x = year, y = maxTemp, fill = venue), stat = 'identity') + 
   facet_wrap(vars(venue))
 
 p1 <- para_df %>% 
-  group_by(year(datetime), venue, period) %>%
-  summarise(maxTemp = max(temperature))
+  group_by(year, venue, period) %>%
+  summarise(maxTemp = max(temperature),
+            meanTemp = round(mean(temperature), 1))
 ggplot(p1) + 
-  geom_bar(aes(x = `year(datetime)`, y = maxTemp, fill = venue), stat = 'identity') + 
+  geom_bar(aes(x = year, y = maxTemp, fill = venue), stat = 'identity') + 
   facet_wrap(vars(venue))
 ```
 
@@ -286,17 +294,18 @@ ggplot(p1) +
 # Humidity at hottest part of day
 q1q2 <- oly_df %>%
   filter(hour(datetime) >= 5 & hour(datetime) <= 19) %>%
-  group_by(year(datetime), venue, period) %>%
+  group_by(year, venue, period) %>%
   mutate(maxTemp = max(temperature)) %>%
   filter(temperature == maxTemp) %>%
   select(venue, maxTemp, humidity, period) %>%
   unique() %>%
   summarise(maxTemp = max(maxTemp),
-            humidity = max(humidity))
+            humidity = max(humidity),
+            )
 
 p1p2 <- para_df %>%
   filter(hour(datetime) >= 5 & hour(datetime) <= 19) %>%
-  group_by(year(datetime), venue, period) %>%
+  group_by(year, venue, period) %>%
   mutate(maxTemp = max(temperature)) %>%
   filter(temperature == maxTemp) %>%
   select(venue, maxTemp, humidity, period) %>%
@@ -330,13 +339,16 @@ Where
 
 heatIndex <- function(temp, humid) {
   
+  if (is.na(humid) == TRUE) {
+    return(NA)}
+  
   if (temp < 27) {
-    warning('Heat index calculation valid only for temperatures 27 degrees or above')
+    #warning('Heat index calculation valid only for temperatures 27 degrees or above')
     return(temp)
   }
   
   if (humid < 40) {
-    warning('Heat index calculation valid only for humidity 40% or above')
+    #warning('Heat index calculation valid only for humidity 40% or above')
     return(temp)
   }
   
@@ -359,32 +371,39 @@ return(round(heatIndex, digits = 1))
   
 }
 
+# Update dataframes
+oly_df <- oly_df %>%
+  mutate(feelsLike = as.vector(map2_dbl(temperature, humidity, .f = heatIndex)))
+
+para_df <- para_df %>%
+  mutate(feelsLike = as.vector(map2_dbl(temperature, humidity, .f = heatIndex)))
+
 ```
 
 ```{r}
 # Feels like maximum temperature
 q3q4 <- oly_df %>%
   filter(hour(datetime) >= 5 & hour(datetime) <= 19) %>%
-  mutate(feelsLike = heatIndex(temperature, humidity)) %>%
   select(-rainfall, -`wind speed`) %>%
-  group_by(year(datetime), venue, period) %>%
+  group_by(year, venue, period) %>%
   summarise(maxFeelsLike = max(feelsLike),
             minFeelsLike = min(feelsLike))
+
 ggplot(q3q4) + 
-  geom_line(aes(x = `year(datetime)`, y = maxFeelsLike, color = venue)) +
-  geom_line(aes(x = `year(datetime)`, y = minFeelsLike, color = venue)) +
+  geom_line(aes(x = year, y = maxFeelsLike, color = venue)) +
+  geom_line(aes(x = year, y = minFeelsLike, color = venue)) +
   facet_wrap(vars(venue))
 
 p3p4 <- para_df %>%
   filter(hour(datetime) >= 5 & hour(datetime) <= 19) %>%
-  mutate(feelsLike = heatIndex(temperature, humidity)) %>%
   select(-rainfall, -`wind speed`) %>%
-  group_by(year(datetime), venue, period) %>%
+  group_by(year, venue, period) %>%
   summarise(maxFeelsLike = max(feelsLike),
             minFeelsLike = min(feelsLike))
+
 ggplot(p3p4) + 
-  geom_line(aes(x = `year(datetime)`, y = maxFeelsLike, color = venue)) +
-  geom_line(aes(x = `year(datetime)`, y = minFeelsLike, color = venue)) +
+  geom_line(aes(x = year, y = maxFeelsLike, color = venue)) +
+  geom_line(aes(x = year, y = minFeelsLike, color = venue)) +
   facet_wrap(vars(venue))
 ```
 
@@ -395,32 +414,30 @@ It is useful to compare venues by how many days where the 'feels like' temperatu
 ```{r}
 
 q5q6q7 <- oly_df %>%
-  mutate(feelsLike = heatIndex(temperature, humidity)) %>%
-  group_by(year(datetime), day(datetime), venue, period) %>%
+  group_by(year, day, venue, period) %>%
   summarise(maxFeelsLike = max(feelsLike)) %>%
-  group_by(venue, `year(datetime)`, period) %>%
-  mutate(over30 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 30])/
-                           n_distinct(`day(datetime)`))*100, 0),
-         over35 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 35])/
-                           n_distinct(`day(datetime)`))*100, 0),
-         over40 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 40])/
-                           n_distinct(`day(datetime)`))*100, 0)) %>%
-  select(`year(datetime)`, period, venue, over30, over35, over40) %>%
+  group_by(year, venue, period) %>%
+  mutate(over30 = round((n_distinct(day[maxFeelsLike >= 30])/
+                           n_distinct(day))*100, 0),
+         over35 = round((n_distinct(day[maxFeelsLike >= 35])/
+                           n_distinct(day))*100, 0),
+         over40 = round((n_distinct(day[maxFeelsLike >= 40])/
+                           n_distinct(day))*100, 0)) %>%
+  select(year, period, venue, over30, over35, over40) %>%
   unique() %>%
   arrange(venue)
 
 p5p6p7 <- para_df %>%
-  mutate(feelsLike = heatIndex(temperature, humidity)) %>%
-  group_by(year(datetime), day(datetime), venue, period) %>%
+  group_by(year, day, venue, period) %>%
   summarise(maxFeelsLike = max(feelsLike)) %>%
-  group_by(venue, `year(datetime)`, period) %>%
-  mutate(over30 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 30])/
-                           n_distinct(`day(datetime)`))*100, 0),
-         over35 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 35])/
-                           n_distinct(`day(datetime)`))*100, 0),
-         over40 = round((n_distinct(`day(datetime)`[maxFeelsLike >= 40])/
-                           n_distinct(`day(datetime)`))*100, 0)) %>%
-  select(`year(datetime)`, period, venue, over30, over35, over40) %>%
+  group_by(year, venue, period) %>%
+  mutate(over30 = round((n_distinct(day[maxFeelsLike >= 30])/
+                           n_distinct(day))*100, 0),
+         over35 = round((n_distinct(day[maxFeelsLike >= 35])/
+                           n_distinct(day))*100, 0),
+         over40 = round((n_distinct(day[maxFeelsLike >= 40])/
+                           n_distinct(day))*100, 0)) %>%
+  select(year, period, venue, over30, over35, over40) %>%
   unique() %>%
   arrange(venue)
 
@@ -431,11 +448,11 @@ p5p6p7 <- para_df %>%
 ```{r}
 # Total rainfall
 q8 <- oly_df %>%
-  group_by(year(datetime), venue, period) %>%
+  group_by(year, venue, period) %>%
   summarise(rain = sum(rainfall))
 
 p8 <- para_df %>%
-  group_by(year(datetime), venue, period) %>%
+  group_by(year, venue, period) %>%
   summarise(rain = sum(rainfall))
 ```
 
@@ -444,21 +461,21 @@ p8 <- para_df %>%
 ``` {r}
 # Number days rained
 q9 <- oly_df %>% 
-  group_by(year(datetime), day(datetime), venue, period) %>%
+  group_by(year, day, venue, period) %>%
   summarise(rain = sum(rainfall)) %>%
-  group_by(venue, `year(datetime)`, period) %>%
-  mutate(daysrained = round(n_distinct(`day(datetime)`[rain > 0])/
-                              n_distinct(`day(datetime)`)*100, 0)) %>%
-  select(`year(datetime)`, period, venue, daysrained) %>%
+  group_by(venue, year, period) %>%
+  mutate(daysrained = round(n_distinct(day[rain > 0])/
+                              n_distinct(day)*100, 0)) %>%
+  select(year, period, venue, daysrained) %>%
   unique()
 
-p9 <- para_df %>% 
-  group_by(year(datetime), day(datetime), venue, period) %>%
+p9 <- para_df %>%
+  group_by(year, day, venue, period) %>%
   summarise(rain = sum(rainfall)) %>%
-  group_by(venue, `year(datetime)`, period) %>%
-  mutate(daysrained = round(n_distinct(`day(datetime)`[rain > 0])/
-                              n_distinct(`day(datetime)`)*100, 0)) %>%
-  select(`year(datetime)`, period, venue, daysrained) %>%
+  group_by(venue, year, period) %>%
+  mutate(daysrained = round(n_distinct(day[rain > 0])/
+                              n_distinct(day)*100, 0)) %>%
+  select(year, period, venue, daysrained) %>%
   unique()
 
 ```
@@ -468,14 +485,16 @@ p9 <- para_df %>%
 Bringing together the analysis pieces for each aspect listed above we are left with the following. Then export to excel for report.
 
 ```{r summary table}
-allo <- left_join(q1q2, q3q4) %>%
+allo <- left_join(q1, q1q2) %>%
+  left_join(., q3q4) %>%
   left_join(., q5q6q7) %>%
   left_join(., q8) %>%
   left_join(., q9) %>%
-  rename('Year' = `year(datetime)`,
+  rename('Year' = year,
          'Period' = period,
          'Venue' = venue,
          'Max Temp' = maxTemp,
+         'Avg Temp' = meanTemp,
          'Humidity (%)' = humidity,
          'Max Feels Like' = maxFeelsLike,
          'Min Feels Like' = minFeelsLike,
@@ -494,14 +513,16 @@ allo <- left_join(q1q2, q3q4) %>%
 #     knitr::kable()
 #   })
 
-allp <- left_join(p1p2, p3p4) %>%
+allp <- left_join(p1, p1p2) %>%
+  left_join(., p3p4) %>%
   left_join(., p5p6p7) %>%
   left_join(., p8) %>%
   left_join(., p9) %>%
-  rename('Year' = `year(datetime)`,
+  rename('Year' = year,
          'Period' = period,
          'Venue' = venue,
          'Max Temp' = maxTemp,
+         'Avg Temp' = meanTemp,
          'Humidity (%)' = humidity,
          'Max Feels Like' = maxFeelsLike,
          'Min Feels Like' = minFeelsLike,
@@ -534,12 +555,11 @@ ma <- function(x, n = 5){stats::filter(x, rep(1 / n, n), sides = 2)}
 gdf_o <- oly_df %>%
   filter(venue == 'tokyo',
          hour(datetime) != 0,
-         year(datetime) != 2015) %>%
-  mutate(feelsLike = as_vector(map2(temperature, humidity, heatIndex))) %>%
-  group_by(day(datetime)) %>%
+         year != 2015) %>%
+  group_by(day) %>%
   summarise(`Feels Like Temperature` = mean(feelsLike, na.rm = TRUE),
             Date = max(date(datetime))) %>%
-  rename('Day' = `day(datetime)`) %>%
+  rename('Day' = day) %>%
   arrange(desc(Date)) %>%
   mutate(`5 Day Rolling Avg` = ma(`Feels Like Temperature`, n = 5))
 
@@ -566,12 +586,11 @@ Below is the same chart for the Paralympic period.
 gdf_p <- para_df %>%
   filter(venue == 'tokyo',
          hour(datetime) != 0,
-         year(datetime) != 2015) %>%
-  mutate(feelsLike = as_vector(map2(temperature, humidity, heatIndex))) %>%
-  group_by(day(datetime)) %>%
+         year != 2015) %>%
+  group_by(day) %>%
   summarise(`Feels Like Temperature` = mean(feelsLike, na.rm = TRUE),
-           Date = max(date(datetime))) %>%
-  rename('Day' = `day(datetime)`) %>%
+            Date = max(date(datetime))) %>%
+  rename('Day' = day) %>%
   arrange(desc(Date)) %>%
   mutate(`5 Day Rolling Avg` = ma(`Feels Like Temperature`, n = 5))
 
